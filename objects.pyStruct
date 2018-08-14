@@ -1,0 +1,13 @@
+declare blueprint items
+define items...field itemName...str()
+define items...field itemWeight...int(1)
+
+declare blueprint itemList
+define itemList...field listName...str()
+define itemList...field listWeight...int(1)
+define itemList...list item...items([])
+
+declare blueprint manifest
+define manifest...field manifestName...str()
+define manifest...list lists...itemList([])
+
