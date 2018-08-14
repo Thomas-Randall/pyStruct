@@ -3,6 +3,10 @@
 Define, update, import, and export struct formats to organize data for Python Runtimes
 
 ## Implemented
+v0.2: In-editor key features
+  + Code simplified to support in-editor actions
+  + View current pyStruct in-editor
+
 v0.1: Import and export operations
  + pyStruct formatting and rules:
    * One instruction per line with three fields: command, target, and data
@@ -19,6 +23,6 @@ v0.1: Import and export operations
    * Tertiary data must be supplied for all definitions except strings
 
 ## To Be Implemented
-+ In-editor declaration, definition, and actual editing
++ In-editor deletion, redefinition, editing
 + Generate object instance from blueprint
 

@@ -1,6 +1,6 @@
 import os
 
-pyStructEditorVersion = "v0.1.1"
+pyStructEditorVersion = "v0.2"
 
 # Used in editing/creation of pyStructs
 valid_pyStruct_commands = ['declare', 'define']
@@ -64,6 +64,130 @@ class pyStructError(Exception):
   define car...field year...int(1990)
   define car...list previous_owners...str([])
 '''
+
+def pyStruct_declare(target, data):
+  if len(target.split('...')) != 1:
+    raise pyStructError("Invalid declaration", "No target subdivision for declarations")
+  primary_target = target
+  name = data
+  if name in dir(__builtins__):
+    raise pyStructError("Invalid name", "Cannot redefine native Python types")
+  # At this point, the declare command is successful
+  valid_targets['primary'].append(name)
+  new_dataTypes.append(name)
+  pyStructs[name] = {}
+  recordedTypes[name] = {}
+
+def pyStruct_define(target, data):
+  primary_target = target.split('...')[0]
+  if primary_target not in valid_targets['primary']:
+    raise pyStructError("Invalid namespace", primary_target)
+  if len(target.split('...')) == 2:
+    secondary_target = target.split('...')[1]
+    if secondary_target not in valid_targets['secondary']:
+      raise pyStructError("Invalid element", secondary_target)
+  if len(data.split('...')) != 2:
+    raise pyStructError("Invalid data", data)
+  name, metadata = data.split('...')
+  if name in dir(__builtins__):
+    raise pyStructError("Invalid name", "Cannot redefine native Python types")
+  if name in pyStructs[primary_target]:
+    raise pyStructError("Invalid name", "Cannot redefine '"+name+"' in '"+ \
+                        primary_target+"' blueprint")
+  dataType = metadata[:metadata.find("(")]
+  initial_value = metadata[metadata.find("(")+1:metadata.rfind(")")]
+  if dataType not in valid_dataTypes and dataType not in new_dataTypes:
+    raise pyStructError("Invalid data type", dataType)
+  # At this point, the non-declare command is successful
+  recordedTypes[primary_target][name] = dataType
+  if secondary_target in new_dataTypes:
+    pyStructs[primary_target][name] = initial_value
+  if secondary_target == 'field':
+    if dataType == 'int' or dataType == 'integer':
+      try:
+        pyStructs[primary_target][name] = int(initial_value)
+      except ValueError as e:
+        raise pyStructError("Type disagreement", e.args[0])
+    elif dataType == 'long':
+      try:
+        pyStructs[primary_target][name] = long(initial_value)
+      except ValueError as e:
+        raise pyStructError("Type disagreement", e.args[0])
+    elif dataType == 'float':
+      try:
+        pyStructs[primary_target][name] = float(initial_value)
+      except ValueError as e:
+        raise pyStructError("Type disagreement", e.args[0])
+    elif dataType == 'str' or dataType == 'string':
+      try:
+        pyStructs[primary_target][name] = str(initial_value)
+      except ValueError as e:
+        raise pyStructError("Type disagreement", e.args[0])
+  elif secondary_target == 'list':
+    pyStructs[primary_target][name] = []
+    # Shortcut empty list by omission
+    if initial_value != "[]":
+      if dataType == 'int' or dataType == 'integer':
+        initial_list = initial_value[1:len(initial_value)-1].split(',')
+        for value in initial_list:
+          try:
+            pyStructs[primary_target][name].append(int(value))
+          except ValueError as e:
+            raise pyStructError("Type disagreement", e.args[0])
+      elif dataType == 'long':
+        initial_list = initial_value[1:len(initial_value)-1].split(',')
+        for value in initial_list:
+          try:
+            pyStructs[primary_target][name].append(long(value))
+          except ValueError as e:
+            raise pyStructError("Type disagreement", e.args[0])
+      elif dataType == 'float':
+        initial_list = initial_value[1:len(initial_value)-1].split(',')
+        for value in initial_list:
+          try:
+            pyStructs[primary_target][name].append(float(value))
+          except ValueError as e:
+            raise pyStructError("Type disagreement", e.args[0])
+      elif dataType == 'str' or dataType == 'string':
+        initial_list = initial_value[1:len(initial_value)-1].split(',')
+        for value in initial_list:
+          try:
+            pyStructs[primary_target][name].append(str(value))
+          except ValueError as e:
+            raise pyStructError("Type disagreement", e.args[0])
+    elif secondary_target == 'dict' or secondary_target == 'dictionary':
+      pyStructs[primary_target][name] = {}
+      # Shortcut empty dictionary by omission
+      if initial_value != "{}":
+        if dataType == 'int' or dataType == 'integer':
+          initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
+          for key, value in initial_dictionary.split(':'):
+            try:
+              pyStructs[primary_target][name][key] = int(value)
+            except ValueError as e:
+              raise pyStructError("Type disagreement", e.args[0])
+        if dataType == 'long':
+          initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
+          for key, value in initial_dictionary.split(':'):
+            try:
+              pyStructs[primary_target][name][key] = long(value)
+            except ValueError as e:
+              raise pyStructError("Type disagreement", e.args[0])
+        if dataType == 'float':
+          initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
+          for key, value in initial_dictionary.split(':'):
+            try:
+              pyStructs[primary_target][name][key] = float(value)
+            except ValueError as e:
+              raise pyStructError("Type disagreement", e.args[0])
+        if dataType == 'str' or dataType == 'string':
+          initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
+          for key, value in initial_dictionary.split(':'):
+            try:
+              pyStructs[primary_target][name][key] = str(value)
+            except ValueError as e:
+              raise pyStructError("Type disagreement", e.args[0])
+
 def pyStruct_load(*fileName):
   if len(fileName[0]) != 1:
     raise argumentError("Requires one argument", "File to be opened")
@@ -83,133 +207,21 @@ def pyStruct_load(*fileName):
         if command not in valid_pyStruct_commands:
           raise pyStructError("Invalid command", command)
         if command == "declare":
-          if len(target.split('...')) != 1:
-            raise pyStructError("Invalid declaration", "No target subdivision for declarations")
-          primary_target = target
-          name = data
-          if name in dir(__builtins__):
-            raise pyStructError("Invalid name", "Cannot redefine native Python types")
-          # At this point, the declare command is successful
-          valid_targets['primary'].append(name)
-          new_dataTypes.append(name)
-          pyStructs[name] = {}
-          recordedTypes[name] = {}
-        # This a non-declare command
+          try:
+            pyStruct_declare(target, data)
+          except pyStructError as e:
+            raise e
         else:
-          primary_target = target.split('...')[0]
-          if primary_target not in valid_targets['primary']:
-            raise pyStructError("Invalid namespace", primary_target)
-          if len(target.split('...')) == 2:
-            secondary_target = target.split('...')[1]
-            if secondary_target not in valid_targets['secondary']:
-              raise pyStructError("Invalid element", secondary_target)
-          if len(data.split('...')) != 2:
-            raise pyStructError("Invalid data", data)
-          name, metadata = data.split('...')
-          if name in dir(__builtins__):
-            raise pyStructError("Invalid name", "Cannot redefine native Python types")
-          if name in pyStructs[primary_target]:
-            raise pyStructError("Invalid name", "Cannot redefine '"+name+"' in '"+ \
-                                primary_target+"' blueprint")
-          dataType = metadata[:metadata.find("(")]
-          initial_value = metadata[metadata.find("(")+1:metadata.rfind(")")]
-          if dataType not in valid_dataTypes and dataType not in new_dataTypes:
-            raise pyStructError("Invalid data type", dataType)
-          # At this point, the non-declare command is successful
-          recordedTypes[primary_target][name] = dataType
-          if secondary_target in new_dataTypes:
-            pyStructs[primary_target][name] = initial_value
-          if secondary_target == 'field':
-            if dataType == 'int' or dataType == 'integer':
-              try:
-                pyStructs[primary_target][name] = int(initial_value)
-              except ValueError as e:
-                raise pyStructError("Type disagreement", e.args[0])
-            elif dataType == 'long':
-              try:
-                pyStructs[primary_target][name] = long(initial_value)
-              except ValueError as e:
-                raise pyStructError("Type disagreement", e.args[0])
-            elif dataType == 'float':
-              try:
-                pyStructs[primary_target][name] = float(initial_value)
-              except ValueError as e:
-                raise pyStructError("Type disagreement", e.args[0])
-            elif dataType == 'str' or dataType == 'string':
-              try:
-                pyStructs[primary_target][name] = str(initial_value)
-              except ValueError as e:
-                raise pyStructError("Type disagreement", e.args[0])
-          elif secondary_target == 'list':
-            pyStructs[primary_target][name] = []
-            # Shortcut empty list by omission
-            if initial_value != "[]":
-              if dataType == 'int' or dataType == 'integer':
-                initial_list = initial_value[1:len(initial_value)-1].split(',')
-                for value in initial_list:
-                  try:
-                    pyStructs[primary_target][name].append(int(value))
-                  except ValueError as e:
-                    raise pyStructError("Type disagreement", e.args[0])
-              elif dataType == 'long':
-                initial_list = initial_value[1:len(initial_value)-1].split(',')
-                for value in initial_list:
-                  try:
-                    pyStructs[primary_target][name].append(long(value))
-                  except ValueError as e:
-                    raise pyStructError("Type disagreement", e.args[0])
-              elif dataType == 'float':
-                initial_list = initial_value[1:len(initial_value)-1].split(',')
-                for value in initial_list:
-                  try:
-                    pyStructs[primary_target][name].append(float(value))
-                  except ValueError as e:
-                    raise pyStructError("Type disagreement", e.args[0])
-              elif dataType == 'str' or dataType == 'string':
-                initial_list = initial_value[1:len(initial_value)-1].split(',')
-                for value in initial_list:
-                  try:
-                    pyStructs[primary_target][name].append(str(value))
-                  except ValueError as e:
-                    raise pyStructError("Type disagreement", e.args[0])
-            elif secondary_target == 'dict' or secondary_target == 'dictionary':
-              pyStructs[primary_target][name] = {}
-              # Shortcut empty dictionary by omission
-              if initial_value != "{}":
-                if dataType == 'int' or dataType == 'integer':
-                  initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
-                  for key, value in initial_dictionary.split(':'):
-                    try:
-                      pyStructs[primary_target][name][key] = int(value)
-                    except ValueError as e:
-                      raise pyStructError("Type disagreement", e.args[0])
-                if dataType == 'long':
-                  initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
-                  for key, value in initial_dictionary.split(':'):
-                    try:
-                      pyStructs[primary_target][name][key] = long(value)
-                    except ValueError as e:
-                      raise pyStructError("Type disagreement", e.args[0])
-                if dataType == 'float':
-                  initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
-                  for key, value in initial_dictionary.split(':'):
-                    try:
-                      pyStructs[primary_target][name][key] = float(value)
-                    except ValueError as e:
-                      raise pyStructError("Type disagreement", e.args[0])
-                if dataType == 'str' or dataType == 'string':
-                  initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
-                  for key, value in initial_dictionary.split(':'):
-                    try:
-                      pyStructs[primary_target][name][key] = str(value)
-                    except ValueError as e:
-                      raise pyStructError("Type disagreement", e.args[0])
-        '''
-        print("Structs:")
-        print(pyStructs)
-        print("Recorded Types:")
-        print(recordedTypes)
-        '''
+          try:
+            pyStruct_define(target, data)
+          except pyStructError as e:
+            raise e
+    '''
+    print("Structs:")
+    print(pyStructs)
+    print("Recorded Types:")
+    print(recordedTypes)
+    '''
   except IOError:
     raise IOError("File '"+fileName+"' does not exist")
 
@@ -245,10 +257,14 @@ def pyStruct_export(*args):
       output.writelines('\n')
 
 if __name__ == "__main__":
+  os.system("clear")
   print("Welcome to pyStruct Editor "+pyStructEditorVersion+"!")
   prompt = "COMMANDS:\n" \
-    "load [file] : Read pyStruct file\n" \
-    "create [file] : Create a new pyStruct file\n" \
+    "load [file] : Read pyStruct from file\n" \
+    "declare blueprint [namespace] : Add a namespace to the working pyStruct\n" \
+    "define  [namespace]...[field, list, dict] [name]...[type](initial_value) :" \
+    " Define an element in namespace\n" \
+    "view : Visualize the current pyStruct \n" \
     "export [file] : Export current pyStruct to file\n" \
     "quit : Exit the editor\n" \
     "more to come soon!\n"
@@ -276,8 +292,33 @@ if __name__ == "__main__":
       except pyStructError as e:
         # Generally irrecoverable without file modification, sysexit
         raise pyStructError("Potentially irrecoverable issue", e.args[0], e.args[1])
-    elif command == "create":
-      print("Yup this is a command")
+    elif command == "declare":
+      try:
+        print(arguments)
+        pyStruct_declare(arguments[0], arguments[1])
+        print("Successfully declared")
+      except argumentError as e:
+        # Recoverable, do not sysexit
+        print("ERROR:")
+        print(e)
+      except pyStructError as e:
+        # Recoverable, just don't do the command
+        print("ERROR:")
+        print(e)
+    elif command == "define":
+      try:
+        pyStruct_define(arguments[0], arguments[1])
+        print("Successfully defined")
+      except argumentError as e:
+        # Recoverable, do not sysexit
+        print("ERROR:")
+        print(e)
+      except pyStructError as e:
+        # Recoverable, just don't do the command
+        print("ERROR:")
+        print(e)
+    elif command == "view":
+      print(pyStructs)
     elif command == "export":
       try:
         pyStruct_export(arguments)
