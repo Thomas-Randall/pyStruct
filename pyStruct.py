@@ -1,9 +1,9 @@
 import os
 
-pyStructEditorVersion = "v0.2"
+pyStructEditorVersion = "v0.2.1"
 
 # Used in editing/creation of pyStructs
-valid_pyStruct_commands = ['declare', 'define']
+valid_pyStruct_commands = ['declare', 'define', 'rename']
 valid_targets = { 'primary': ['blueprint'],
   'secondary': ['field', 'list', 'dict'] }
 valid_dataTypes = ['int', 'integer', 'long', 'float', 'str', 'string']
@@ -52,17 +52,56 @@ class pyStructError(Exception):
       full_message += ": "+str(item)
     return full_message
 
+# Helper function: Renames target dictionary key to replace (works in nested dicts)
+def recursive_replace_key(dictionary, target, replace):
+  for key, value in dictionary.iteritems():
+    if key == target:
+      dictionary[replace] = dictionary.pop(target)
+    if isinstance(value, dict):
+      recursive_replace_key(value, target, replace)
 
+# Helper function: Renames target dictionary values to replace (works in nested dicts)
+def recursive_replace_value(dictionary, target, replace):
+  for key, value in dictionary.iteritems():
+    if value == target:
+      dictionary[key] = replace
+    if isinstance(value, dict):
+      recursive_replace_value(value, target, replace)
+
+# Helper function: True if key exists in dictionary (works in nested dicts)
+def recursive_find_key(dictionary, target):
+  for key, value in dictionary.iteritems():
+    if key == target:
+      return True
+    if isinstance(value, dict):
+      if recursive_find_key(value, target):
+        return True
+  return False
+
+# Helper function: True if value exists in dictionary (works in nested dicts)
+def recursive_find_value(dictionary, target):
+  for key, value in dictionary.iteritems():
+    if value == target:
+      return True
+    if isinstance(value, dict):
+      if recursive_find_value(value, target):
+        return True
+  return False
 
 '''
   Requires one argument: filename to open to create pyStruct from
   Uses variadic argument to elegantly handle user failure during runtime
+  Blueprint names are globally reserved namespaces
+  Element names are independently reserved namespaces within blueprints
 
   Ex:
   declare blueprint car
   define car...field make...str()
   define car...field year...int(1990)
   define car...list previous_owners...str([])
+  declare blueprint boat
+  define boat...field make...str()
+  define boat...field year...int(2000)
 '''
 
 def pyStruct_declare(target, data):
@@ -72,6 +111,10 @@ def pyStruct_declare(target, data):
   name = data
   if name in dir(__builtins__):
     raise pyStructError("Invalid name", "Cannot redefine native Python types")
+  if name == "blueprint":
+    raise pyStructError("Invalid name", "Namespace 'blueprint' is reserved by pyStruct")
+  if recursive_find_key(pyStructs, name):
+    raise pyStructError("Clobbering dictionary", "'"+name+"' is already defined")
   # At this point, the declare command is successful
   valid_targets['primary'].append(name)
   new_dataTypes.append(name)
@@ -91,14 +134,16 @@ def pyStruct_define(target, data):
   name, metadata = data.split('...')
   if name in dir(__builtins__):
     raise pyStructError("Invalid name", "Cannot redefine native Python types")
-  if name in pyStructs[primary_target]:
+  if name in pyStructs.keys():
+    raise pyStructError("Invalid name", "'"+name+"' is already declared as a blueprint")
+  if name in pyStructs[primary_target].keys():
     raise pyStructError("Invalid name", "Cannot redefine '"+name+"' in '"+ \
                         primary_target+"' blueprint")
   dataType = metadata[:metadata.find("(")]
   initial_value = metadata[metadata.find("(")+1:metadata.rfind(")")]
   if dataType not in valid_dataTypes and dataType not in new_dataTypes:
     raise pyStructError("Invalid data type", dataType)
-  # At this point, the non-declare command is successful
+  # At this point, the define command is successful
   recordedTypes[primary_target][name] = dataType
   if secondary_target in new_dataTypes:
     pyStructs[primary_target][name] = initial_value
@@ -120,6 +165,10 @@ def pyStruct_define(target, data):
         raise pyStructError("Type disagreement", e.args[0])
     elif dataType == 'str' or dataType == 'string':
       try:
+        if initial_value.startswith('"') and initial_value.endswith('"'):
+          initial_value = initial_value[1:len(initial_value)-1]
+        elif initial_value.startswith("'") and initial_value.endswith("'"):
+          initial_value = initial_value[1:len(initial_value)-1]
         pyStructs[primary_target][name] = str(initial_value)
       except ValueError as e:
         raise pyStructError("Type disagreement", e.args[0])
@@ -149,9 +198,13 @@ def pyStruct_define(target, data):
           except ValueError as e:
             raise pyStructError("Type disagreement", e.args[0])
       elif dataType == 'str' or dataType == 'string':
-        initial_list = initial_value[1:len(initial_value)-1].split(',')
+        initial_list = initial_value.split(',')
         for value in initial_list:
           try:
+            if (value.startswith('"') and value.endswith('"')):
+              value = value[1:len(value)-1]
+            elif (value.startswith("'") and value.endswith("'")):
+              value = value[1:len(value)-1]
             pyStructs[primary_target][name].append(str(value))
           except ValueError as e:
             raise pyStructError("Type disagreement", e.args[0])
@@ -181,12 +234,52 @@ def pyStruct_define(target, data):
             except ValueError as e:
               raise pyStructError("Type disagreement", e.args[0])
         if dataType == 'str' or dataType == 'string':
-          initial_dictionary = initial_value[1:len(initial_value)-1].split(',')
+          initial_dictionary = initial_value.split(',')
           for key, value in initial_dictionary.split(':'):
             try:
+              if value.startswith('"') and value.endswith('"'):
+                value = value[1:len(value)-1]
+              elif value.startswith("'") and value.endswith("'"):
+                value = value[1:len(value)-1]
               pyStructs[primary_target][name][key] = str(value)
             except ValueError as e:
               raise pyStructError("Type disagreement", e.args[0])
+
+def pyStruct_rename(target, data):
+  namespace_target, specific_target = target.split('...')
+  if namespace_target not in valid_targets['primary']:
+    raise argumentError("Invalid argument", namespace_target, "Is not a proper namespace")
+  if namespace_target == "blueprint":
+    # Redefine a blueprint name
+    if specific_target not in valid_targets['primary']:
+      raise argumentError("Invalid argument", specific_target, "Is not a proper namespace")
+    if data in valid_targets['primary']:
+      raise pyStructError("Clobbered dictionary", "Cannot duplicate namespace", data)
+    if data in dir(__builtins__):
+      raise pyStructError("Invalid name", "Cannot redefine native Python types")
+    if data == "blueprint":
+      raise pyStructError("Invalid name", "Namespace 'blueprint' is reserved by pyStruct")
+    # At this point, the rename command is successful
+    recursive_replace_key(pyStructs, specific_target, data)
+    recursive_replace_key(recordedTypes, specific_target, data)
+    recursive_replace_value(recordedTypes, specific_target, data)
+    valid_targets['primary'].remove(specific_target)
+    valid_targets['primary'].append(data)
+  else:
+    # Redefine an element name
+    if specific_target not in pyStructs[namespace_target].keys():
+      raise pyStructError("Invalid target", "'"+specific_target+ \
+                          "' is not an element in '"+namespace_target+"'")
+    if data in dir(__builtins__):
+      raise pyStructError("Invalid name", "Cannot redefine native Python types")
+    if data in pyStructs.keys():
+      raise pyStructError("Invalid name", "'"+data+"' is already declared as a blueprint")
+    if data in pyStructs[namespace_target].keys():
+      raise pyStructError("Invalid name", "Cannot duplicate '"+data+"' in '"+ \
+                          namespace_target+"' blueprint")
+    # At this point, the rename command is successful
+    recursive_replace_key(pyStructs, specific_target, data)
+    recursive_replace_key(recordedTypes, specific_target, data)
 
 def pyStruct_load(*fileName):
   if len(fileName[0]) != 1:
@@ -211,9 +304,14 @@ def pyStruct_load(*fileName):
             pyStruct_declare(target, data)
           except pyStructError as e:
             raise e
-        else:
+        elif command == "define":
           try:
             pyStruct_define(target, data)
+          except pyStructError as e:
+            raise e
+        elif command == "rename":
+          try:
+            pyStruct_rename(target, data)
           except pyStructError as e:
             raise e
     '''
@@ -250,10 +348,18 @@ def pyStruct_export(*args):
         fieldString = fieldString[fieldString.find("'")+1:fieldString.rfind("'")]
         if fieldString != "list" and fieldString != "dict":
           fieldString = "field"
-        output.writelines("define "+declarable_object+"..."+fieldString+" "+ \
-                          definable_element+"..."+ \
-                          recordedTypes[declarable_object][definable_element]+"("+ \
-                          str(pyStructs[declarable_object][definable_element]).replace(' ','')+")\n")
+        try:
+          output.writelines("define "+declarable_object+"..."+fieldString+" "+ \
+                            definable_element+"..."+ \
+                            recordedTypes[declarable_object][definable_element]+"("+ \
+                            str(pyStructs[declarable_object][definable_element]).replace(' ','')+")\n")
+        except KeyError as e:
+          print('Struct:')
+          print(pyStructs)
+          print('Types:')
+          print(recordedTypes)
+          print('at:'+str(declarable_object)+': '+str(definable_element))
+          raise e
       output.writelines('\n')
 
 if __name__ == "__main__":
@@ -264,18 +370,24 @@ if __name__ == "__main__":
     "declare blueprint [namespace] : Add a namespace to the working pyStruct\n" \
     "define  [namespace]...[field, list, dict] [name]...[type](initial_value) :" \
     " Define an element in namespace\n" \
+    "rename blueprint...[namespace] [newname] : Rename a namespace\n" \
+    "rename [namespace]...[element] [newname] : Rename a defined element\n" \
     "view : Visualize the current pyStruct \n" \
     "export [file] : Export current pyStruct to file\n" \
+    "reset : Restart the editor (note: do not use this command from other programs) \n" \
     "quit : Exit the editor\n" \
     "more to come soon!\n"
   while True:
-    user_input = raw_input(prompt).lower()
+    user_input = raw_input(prompt)
     command = user_input.split(' ')[0]
     arguments = user_input[len(command)+1:].split(' ')
     if command == "quit":
       print("Shutting down...")
       break
-    
+    if command == "reset":
+      os.system("python "+os.path.basename(__file__))
+      break
+
     os.system("clear")
     if command == "load":
       try:
@@ -294,9 +406,11 @@ if __name__ == "__main__":
         raise pyStructError("Potentially irrecoverable issue", e.args[0], e.args[1])
     elif command == "declare":
       try:
-        print(arguments)
         pyStruct_declare(arguments[0], arguments[1])
         print("Successfully declared")
+      except IndexError as e:
+        # Invalid number of arguments
+        print("ERROR: Too few arguments supplied")
       except argumentError as e:
         # Recoverable, do not sysexit
         print("ERROR:")
@@ -309,6 +423,24 @@ if __name__ == "__main__":
       try:
         pyStruct_define(arguments[0], arguments[1])
         print("Successfully defined")
+      except IndexError as e:
+        # Invalid number of arguments
+        print("ERROR: Too few arguments supplied")
+      except argumentError as e:
+        # Recoverable, do not sysexit
+        print("ERROR:")
+        print(e)
+      except pyStructError as e:
+        # Recoverable, just don't do the command
+        print("ERROR:")
+        print(e)
+    elif command == "rename":
+      try:
+        pyStruct_rename(arguments[0], arguments[1])
+        print("Successfully renamed")
+      except IndexError as e:
+        # Invalid number of arguments
+        print("ERROR: Too few arguments supplied")
       except argumentError as e:
         # Recoverable, do not sysexit
         print("ERROR:")
@@ -318,7 +450,10 @@ if __name__ == "__main__":
         print("ERROR:")
         print(e)
     elif command == "view":
+      print('Saved data structures:')
       print(pyStructs)
+      print('Saved type associations:')
+      print(recordedTypes)
     elif command == "export":
       try:
         pyStruct_export(arguments)

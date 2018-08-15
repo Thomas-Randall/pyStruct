@@ -6,6 +6,10 @@ Define, update, import, and export struct formats to organize data for Python Ru
 v0.2: In-editor key features
   + Code simplified to support in-editor actions
   + View current pyStruct in-editor
+v0.2.1: Renaming features
+  + Rename blueprint namespaces
+  + Rename elements
+  + Reset editor achieved by exec() over own process
 
 v0.1: Import and export operations
  + pyStruct formatting and rules:
