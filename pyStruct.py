@@ -1,6 +1,6 @@
 import os
 
-pyStructEditorVersion = "v0.2.1"
+pyStructEditorVersion = "v0.2.2"
 
 # Used in editing/creation of pyStructs
 valid_pyStruct_commands = ['declare', 'define', 'rename']
@@ -286,42 +286,48 @@ def pyStruct_load(*fileName):
     raise argumentError("Requires one argument", "File to be opened")
   fileName = fileName[0][0]
   try:
-    with open(fileName, 'r') as pyStructFile:
-      for instruction in pyStructFile:
-        instruction = instruction.rstrip('\n')
-        if instruction == '':
-          continue
-        # Valid pyStruct instructions must have 3 parts
-        instruction = instruction.split(' ')
-        if len(instruction) != 3:
-          raise pyStructError("Improperly formatted instruction", instruction[0])
-        # Verify all three parts of pyStruct instruction
-        command, target, data = instruction
-        if command not in valid_pyStruct_commands:
-          raise pyStructError("Invalid command", command)
-        if command == "declare":
-          try:
-            pyStruct_declare(target, data)
-          except pyStructError as e:
-            raise e
-        elif command == "define":
-          try:
-            pyStruct_define(target, data)
-          except pyStructError as e:
-            raise e
-        elif command == "rename":
-          try:
-            pyStruct_rename(target, data)
-          except pyStructError as e:
-            raise e
+    pyStructFile = open(fileName, 'r')
+  except IOError:
+    raise IOError("File '"+fileName+"' does not exist")
+  else:
+    line_num = 0
+    for instruction in pyStructFile:
+      line_num += 1
+      instruction = instruction.rstrip('\n')
+      if instruction == '':
+        continue
+      # Valid pyStruct instructions must have 3 parts
+      instruction = instruction.split(' ')
+      if len(instruction) != 3:
+        raise pyStructError("Improperly formatted instruction", instruction[0], \
+                            "at "+fileName+":"+str(line_num))
+      # Verify all three parts of pyStruct instruction
+      command, target, data = instruction
+      if command not in valid_pyStruct_commands:
+        raise pyStructError("Invalid command", command, \
+                            "at "+fileName+":"+str(line_num))
+      if command == "declare":
+        try:
+          pyStruct_declare(target, data)
+        except pyStructError as e:
+          raise pyStructError(str(e), "at "+fileName+":"+str(line_num))
+      elif command == "define":
+        try:
+          pyStruct_define(target, data)
+        except pyStructError as e:
+          raise pyStructError(str(e), "at "+fileName+":"+str(line_num))
+      elif command == "rename":
+        try:
+          pyStruct_rename(target, data)
+        except pyStructError as e:
+          raise pyStructError(str(e), "at "+fileName+":"+str(line_num))
+    pyStructFile.close()
     '''
     print("Structs:")
     print(pyStructs)
     print("Recorded Types:")
     print(recordedTypes)
     '''
-  except IOError:
-    raise IOError("File '"+fileName+"' does not exist")
 
 '''
   Reverse engineers the pyStruct into a replicable series of commands that allow
@@ -389,78 +395,36 @@ if __name__ == "__main__":
       break
 
     os.system("clear")
-    if command == "load":
-      try:
-        pyStruct_load(arguments)
-        print("Successfully loaded")
-      except argumentError as e:
-        # Recoverable, do not sysexit
-        print("ERROR:")
-        print(e)
-      except IOError as e:
-        # File corrupted or otherwise unable to open, allow user to attempt to recover
-        print("ERROR:")
-        print(e)
-      except pyStructError as e:
-        # Generally irrecoverable without file modification, sysexit
-        raise pyStructError("Potentially irrecoverable issue", e.args[0], e.args[1])
-    elif command == "declare":
-      try:
+    try:
+      if command == "load":
+        try:
+          pyStruct_load(arguments)
+          print("Successfully loaded")
+        except IOError as e:
+          # File corrupted or otherwise unable to open
+          print("ERROR:")
+          print(e)
+      elif command == "declare":
         pyStruct_declare(arguments[0], arguments[1])
         print("Successfully declared")
-      except IndexError as e:
-        # Invalid number of arguments
-        print("ERROR: Too few arguments supplied")
-      except argumentError as e:
-        # Recoverable, do not sysexit
-        print("ERROR:")
-        print(e)
-      except pyStructError as e:
-        # Recoverable, just don't do the command
-        print("ERROR:")
-        print(e)
-    elif command == "define":
-      try:
+      elif command == "define":
         pyStruct_define(arguments[0], arguments[1])
         print("Successfully defined")
-      except IndexError as e:
-        # Invalid number of arguments
-        print("ERROR: Too few arguments supplied")
-      except argumentError as e:
-        # Recoverable, do not sysexit
-        print("ERROR:")
-        print(e)
-      except pyStructError as e:
-        # Recoverable, just don't do the command
-        print("ERROR:")
-        print(e)
-    elif command == "rename":
-      try:
+      elif command == "rename":
         pyStruct_rename(arguments[0], arguments[1])
         print("Successfully renamed")
-      except IndexError as e:
-        # Invalid number of arguments
-        print("ERROR: Too few arguments supplied")
-      except argumentError as e:
-        # Recoverable, do not sysexit
-        print("ERROR:")
-        print(e)
-      except pyStructError as e:
-        # Recoverable, just don't do the command
-        print("ERROR:")
-        print(e)
-    elif command == "view":
-      print('Saved data structures:')
-      print(pyStructs)
-      print('Saved type associations:')
-      print(recordedTypes)
-    elif command == "export":
-      try:
+      elif command == "view":
+        print('Saved data structures:')
+        print(pyStructs)
+        print('Saved type associations:')
+        print(recordedTypes)
+      elif command == "export":
         pyStruct_export(arguments)
         print("Successfully exported")
-      except argumentError as e:
-        # Recoverable, do not sysexit
-        print("ERROR:")
-        print(e)
-    else:
-      print("Command not recognized")
+      else:
+        print("Command not recognized")
+    except IndexError as e:
+      print("ERROR: Too few arguments supplied")
+    except (argumentError, pyStructError) as e:
+      print("ERROR:")
+      print(e)
