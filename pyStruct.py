@@ -3,7 +3,8 @@ import os
 pyStructEditorVersion = "v0.2.2"
 
 # Used in editing/creation of pyStructs
-valid_pyStruct_commands = ['declare', 'define', 'rename']
+valid_pyStruct_commands = ['declare', 'define', 'rename',
+                           'delete', 'load', 'export']
 valid_targets = { 'primary': ['blueprint'],
   'secondary': ['field', 'list', 'dict'] }
 valid_dataTypes = ['int', 'integer', 'long', 'float', 'str', 'string']
@@ -245,6 +246,22 @@ def pyStruct_define(target, data):
             except ValueError as e:
               raise pyStructError("Type disagreement", e.args[0])
 
+def pyStruct_delete(target, data):
+  if target == "blueprint":
+    if data not in valid_targets['primary']:
+      raise argumentError("Invalid argument", data, "Is not a proper namespace")
+    else:
+      valid_targets['primary'].remove(data)
+      pyStructs.pop(data)
+      recordedTypes.pop(data)
+  else:
+    if target not in valid_targets['primary']:
+      raise argumentError("Invalid argument", target, "Is not a proper namespace")
+    if data not in pyStructs[target].keys():
+      raise pyStructError("Invalid target", "'"+data+"' is not an element in '"+target+"'")
+    pyStructs[target].pop(data)
+    recordedTypes[target].pop(data)
+
 def pyStruct_rename(target, data):
   namespace_target, specific_target = target.split('...')
   if namespace_target not in valid_targets['primary']:
@@ -281,10 +298,9 @@ def pyStruct_rename(target, data):
     recursive_replace_key(pyStructs, specific_target, data)
     recursive_replace_key(recordedTypes, specific_target, data)
 
-def pyStruct_load(*fileName):
-  if len(fileName[0]) != 1:
-    raise argumentError("Requires one argument", "File to be opened")
-  fileName = fileName[0][0]
+def pyStruct_load(fileStr, fileName):
+  if fileStr != "file":
+    raise argumentError("Invalid load format")
   try:
     pyStructFile = open(fileName, 'r')
   except IOError:
@@ -321,6 +337,16 @@ def pyStruct_load(*fileName):
           pyStruct_rename(target, data)
         except pyStructError as e:
           raise pyStructError(str(e), "at "+fileName+":"+str(line_num))
+      elif command == "delete":
+        try:
+	  pyStruct_delete(target, data)
+	except (argumentError, pyStructError) as e:
+	  raise pyStructError(str(e), "at "+fileName+":"+str(line_num))
+      elif command == "load":
+        try:
+	  pyStruct_load(target, data)
+	except (argumentError, IOError, pyStructError) as e:
+	  raise pyStructError(str(e), "at "+fileName+":"+str(line_num))
     pyStructFile.close()
     '''
     print("Structs:")
@@ -336,6 +362,12 @@ def pyStruct_load(*fileName):
   pyStructs.
   Theoretically, pyStruct files should be small, and compression can be used if
   that is no longer the case.
+
+  Note that exporting consolidates the current data structure into ONE SELF-SUFFICIENT FILE,
+  that is to say it will not include any calls to load external data. Modular exporting is
+  not supported at this time, so it is encouraged to build primitives, export, reset, redefine
+  primitives (for dictionary agreement only), build secondary layers, and export, then manually
+  substitute the secondary layers' empty definitions with a suitable load command
 '''
 def pyStruct_export(*args):
   if len(args[0]) != 1 and len(args[0]) != 2:
@@ -372,12 +404,14 @@ if __name__ == "__main__":
   os.system("clear")
   print("Welcome to pyStruct Editor "+pyStructEditorVersion+"!")
   prompt = "COMMANDS:\n" \
-    "load [file] : Read pyStruct from file\n" \
+    "load file [path/name] : Read pyStruct from file\n" \
     "declare blueprint [namespace] : Add a namespace to the working pyStruct\n" \
-    "define  [namespace]...[field, list, dict] [name]...[type](initial_value) :" \
+    "define [namespace]...[field, list, dict] [name]...[type](initial_value) :" \
     " Define an element in namespace\n" \
     "rename blueprint...[namespace] [newname] : Rename a namespace\n" \
     "rename [namespace]...[element] [newname] : Rename a defined element\n" \
+    "delete blueprint [namespace] : Delete target namespace\n" \
+    "delete [namespace] [element] : Delete element in target namespace\n" \
     "view : Visualize the current pyStruct \n" \
     "export [file] : Export current pyStruct to file\n" \
     "reset : Restart the editor (note: do not use this command from other programs) \n" \
@@ -398,12 +432,11 @@ if __name__ == "__main__":
     try:
       if command == "load":
         try:
-          pyStruct_load(arguments)
+          pyStruct_load(arguments[0], arguments[1])
           print("Successfully loaded")
         except IOError as e:
           # File corrupted or otherwise unable to open
-          print("ERROR:")
-          print(e)
+          print("ERROR: "+str(e))
       elif command == "declare":
         pyStruct_declare(arguments[0], arguments[1])
         print("Successfully declared")
@@ -413,6 +446,12 @@ if __name__ == "__main__":
       elif command == "rename":
         pyStruct_rename(arguments[0], arguments[1])
         print("Successfully renamed")
+      elif command == "delete":
+        try:
+	  pyStruct_delete(arguments[0], arguments[1])
+	  print("Successfully deleted")
+	except pyStructError as e:
+	  print("ERROR: "+str(e))
       elif command == "view":
         print('Saved data structures:')
         print(pyStructs)
@@ -426,5 +465,5 @@ if __name__ == "__main__":
     except IndexError as e:
       print("ERROR: Too few arguments supplied")
     except (argumentError, pyStructError) as e:
-      print("ERROR:")
-      print(e)
+      print("ERROR: "+str(e))
+

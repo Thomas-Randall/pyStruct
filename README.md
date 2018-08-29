@@ -3,14 +3,22 @@
 Define, update, import, and export struct formats to organize data for Python Runtimes
 
 ## Implemented
-v0.2: In-editor key features
-  + Code simplified to support in-editor actions
-  + View current pyStruct in-editor
+v0.2.2: Deletion features
+  + Delete a namespace
+  + Delete an element
+  + Load command now follows 3-argument format
+  + Load commands can be used in pyStruct files
+    * Note that the editor's export feature still explicitly exports completely-self-defined pyStructs, meaning that it will not output any load commands
+    * Best practice for now is to define/export primitives, reset, define dummy primitives, define/export secondary, then manually edit secondary export to load the primitive export rather than the dummy definitions
 
 v0.2.1: Renaming features
   + Rename blueprint namespaces
   + Rename elements
   + Reset editor achieved by exec() over own process
+
+v0.2: In-editor key features
+  + Code simplified to support in-editor actions
+  + View current pyStruct in-editor
 
 v0.1: Import and export operations
  + pyStruct formatting and rules:
@@ -28,6 +36,6 @@ v0.1: Import and export operations
    * Tertiary data must be supplied for all definitions except strings
 
 ## To Be Implemented
-+ In-editor deletion, redefinition, editing
++ In-editor redefinition, editing
 + Generate object instance from blueprint
 
