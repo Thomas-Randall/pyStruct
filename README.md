@@ -2,7 +2,23 @@
 
 Define, update, import, and export struct formats to organize data for Python Runtimes
 
+## To Be Implemented
++ Unit tests to make sure things remain working (v0.3.1)
++ Generate object instance from blueprint (v0.3.1)
++ In-editor object-instance editing (v0.3.2)
+
 ## Implemented
+v0.3: PyStruct Class, Redefinition features
+  + Basic command layout now associates namespace...element_name field_type...variable_type(initial_value)
+  + Redefine an element in a blueprint
+  + Soft- or hard-reset the editor
+  + Spaces no longer permitted in blueprint names
+  + Spaces are now permitted in list/dictionary definitions and within string initializations
+  + Deletion now removes associated types etc from types, use 'remove' method rather than 'pop'
+  + Argument errors now more common to help when delimiter rules not followed
+  + More concise try/catch for errors when defining elements, using functions in pyStruct_load(), main()
+  + Class-local template now called pyTemplate rather than somewhat confusing pyStructs
+
 v0.2.2: Deletion features
   + Delete a namespace
   + Delete an element
@@ -34,8 +50,3 @@ v0.1: Import and export operations
      + Tertiary data: initial value for definition
    * Formatting delimiters [' ', '...', '()'] are reserved for pyStruct parsing
    * Tertiary data must be supplied for all definitions except strings
-
-## To Be Implemented
-+ In-editor redefinition, editing
-+ Generate object instance from blueprint
-
