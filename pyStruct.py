@@ -94,7 +94,7 @@ def recursive_find_value(dictionary, target):
 '''
 class pyStruct:
   # Used in editing/creation of pyStructs
-  valid_pyStruct_commands = ['declare', 'define', 'rename', 'redefne',
+  valid_pyStruct_commands = ['declare', 'define', 'rename', 'redefine',
                              'delete', 'load', 'export']
   def __init__(self):
     self.valid_targets = { 'primary': ['blueprint'],
@@ -104,6 +104,7 @@ class pyStruct:
     self.pyTemplate = {}
     self.recordedTypes = {}
 
+  # Create new namespace in template
   def pyStruct_declare(self, target, data):
     if target != "blueprint":
       raise pyStructError("Undefined declaration type", target)
@@ -121,22 +122,24 @@ class pyStruct:
     self.pyTemplate[data] = {}
     self.recordedTypes[data] = {}
 
+  # Delete namespace or element from template
   def pyStruct_delete(self, target, data):
     if target == "blueprint":
       if data not in self.valid_targets['primary']:
         raise argumentError("Invalid argument", data, "Is not a proper namespace")
       self.valid_targets['primary'].remove(data)
       self.new_dataTypes.remove(data)
-      self.pyTemplate.remove(data)
-      self.recordedTypes.remove(data)
+      self.pyTemplate.pop(data, None)
+      self.recordedTypes.pop(data, None)
     else:
       if target not in self.valid_targets['primary']:
         raise argumentError("Invalid argument", target, "Is not a proper namespace")
       if data not in self.pyTemplate[target].keys():
         raise pyStructError("Invalid target", "'"+data+"' is not an element in '"+target+"'")
-      self.pyTemplate[target].remove(data)
-      self.recordedTypes[target].remove(data)
+      self.pyTemplate[target].pop(data)
+      self.recordedTypes[target].pop(data)
 
+  # Create new element in template under a specific namespace
   def pyStruct_define(self, target, data):
     if len(target.split('...')) != 2:
       raise argumentError("Invalid delimiter count for first argument", "Expected: 2", \
@@ -242,6 +245,7 @@ class pyStruct:
     except ValueError as e:
       raise pyStructError("Type disagreement", e.args[0])
 
+  # Re-spec an exisiting element (change type, number, and initialization)
   def pyStruct_redefine(self, target, data):
     # Determine validity of target
     namespace_target, field_target = target.split('...')
@@ -328,6 +332,7 @@ class pyStruct:
     except ValueError as e:
       raise pyStructError("Type disagreement", e.args[0])
 
+  # Change the name of a blueprint or element in a namespace
   def pyStruct_rename(self, target, data):
     namespace_target, specific_target = target.split('...')
     if namespace_target not in self.valid_targets['primary']:
@@ -366,6 +371,7 @@ class pyStruct:
       recursive_replace_key(self.pyTemplate, specific_target, data)
       recursive_replace_key(self.recordedTypes, specific_target, data)
 
+  # Load pyStruct instructions from a file
   def pyStruct_load(self, fileStr, fileName):
     if fileStr != "file":
       raise argumentError("Invalid load format")
@@ -390,7 +396,6 @@ class pyStruct:
           for extraArg in instruction[3:]:
             instruction[2] += str(extraArg)
             instruction.remove(extraArg)
-
         # Verify all three parts of pyStruct instruction
         command, target, data = instruction
         if command not in self.valid_pyStruct_commands:
@@ -460,6 +465,7 @@ class pyStruct:
             raise e
         output.writelines('\n')
 
+# Live command loop environment
 if __name__ == "__main__":
   os.system("clear")
   print("Welcome to pyStruct Editor "+pyStructEditorVersion+"!")
@@ -490,9 +496,11 @@ if __name__ == "__main__":
       if len(user_input.split(' ')) >= 3:
         data_argument = user_input[len(command)+len(target_argument)+2:]
 
+    '''
     print "Command: '"+command+"'"
     print "Targ: '"+target_argument+"'"
     print "Data: '"+data_argument+"'"
+    '''
 
     if command == "quit":
       print("Shutting down...")
