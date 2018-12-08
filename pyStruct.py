@@ -283,18 +283,21 @@ class pyStruct:
           self.pyTemplate[namespace_target][field_target] = str(initial_value)
       elif secondary_target == 'list':
         self.pyTemplate[namespace_target][field_target] = []
+        if initial_value[0] != "[" or initial_value[-1] != "]":
+          raise pyStructError("Invalid initialization", "Lists should be defined in list format (ex: [1,2,3])!")
+        initial_value = initial_value[1:-1]
         # Shortcut empty list by omission
-        if initial_value != "[]":
+        if initial_value != "":
           if dataType == 'int' or dataType == 'integer':
-            initial_list = initial_value[1:len(initial_value)-1].split(',')
+            initial_list = initial_value.split(',')
             for value in initial_list:
               self.pyTemplate[namespace_target][field_target].append(int(value))
           elif dataType == 'long':
-            initial_list = initial_value[1:len(initial_value)-1].split(',')
+            initial_list = initial_value.split(',')
             for value in initial_list:
               self.pyTemplate[namespace_target][field_target].append(long(value))
           elif dataType == 'float':
-            initial_list = initial_value[1:len(initial_value)-1].split(',')
+            initial_list = initial_value.split(',')
             for value in initial_list:
               self.pyTemplate[namespace_target][field_target].append(float(value))
           elif dataType == 'str' or dataType == 'string':
@@ -496,11 +499,9 @@ if __name__ == "__main__":
       if len(user_input.split(' ')) >= 3:
         data_argument = user_input[len(command)+len(target_argument)+2:]
 
-    '''
     print "Command: '"+command+"'"
     print "Targ: '"+target_argument+"'"
     print "Data: '"+data_argument+"'"
-    '''
 
     if command == "quit":
       print("Shutting down...")
