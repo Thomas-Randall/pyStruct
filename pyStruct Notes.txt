@@ -1,0 +1,5 @@
+pyStruct == noSQL database?
+
+EX:
+mongoDB
+firebaseDB (google)
